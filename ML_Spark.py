@@ -29,7 +29,7 @@ sc.setCheckpointDir("checkpointdir2")
 sqlContext=SQLContext(sc)
 
 print("------ reading data -------")
-data=sqlContext.read.parquet("6.1.2.FinalSeq2J2EvtsToKeep10perCent.parquet")
+data=sqlContext.read.parquet("data.parquet")
 
 print(sc.uiWebUrl)
 print("------ train test split --------")
@@ -37,27 +37,23 @@ print("------ train test split --------")
 
 print("--------- Indexing categorical values for OHE------------")
 
-codeIndexer = StringIndexer(inputCol='code_evt', outputCol='code_evt_index').setHandleInvalid("keep")
-firstCodeIndexer = StringIndexer(inputCol='first_code_evt', outputCol='first_code_evt_index').setHandleInvalid("keep")
-lieuIndexer = StringIndexer(inputCol='lieu_evt', outputCol='lieu_evt_index').setHandleInvalid("keep")
-firstLieuIndexer = StringIndexer(inputCol='first_lieu_evt', outputCol='first_lieu_evt_index').setHandleInvalid("keep")
-lastLieuIndexer = StringIndexer(inputCol='lieu_dernier_evt', outputCol='last_lieu_evt_index').setHandleInvalid("keep")
-codeServiceIndexer = StringIndexer(inputCol='code_service', outputCol='code_service_index').setHandleInvalid("keep")
+codeIndexer = StringIndexer(inputCol='code', outputCol='code_index').setHandleInvalid("keep")
+lieuIndexer = StringIndexer(inputCol='lieu', outputCol='lieu_index').setHandleInvalid("keep")
 
 #putting indexed data into a OHE for a better modelling approach
-ohe = OneHotEncoderEstimator(inputCols=['dow','first_dow','seq','code_evt_index','first_code_evt_index','lieu_evt_index','first_lieu_evt_index','last_lieu_evt_index','code_service_index'],outputCols=['dow_category','first_dow_category','seq_category','code_evt_category','first_code_evt_category','lieu_evt_category','first_lieu_evt_category','last_lieu_evt_category','code_service_category']).setHandleInvalid("keep")
+ohe = OneHotEncoderEstimator(inputCols=['lieu_index','code_index'],outputCols=['lieu_category','code_category']).setHandleInvalid("keep")
 
 #Here i combine numerical features into a vector, rescale them between 0 and 1 and then merge the new scaled numerical features with features from the OHE
-numericalAssembler=VectorAssembler(inputCols=['time','timestamp_delta','contractual_time_difference'],outputCol='numerical_features')
+numericalAssembler=VectorAssembler(inputCols=['time'],outputCol='numerical_features')
 numericalScaler=MinMaxScaler(inputCol='numerical_features',outputCol='scaled_numerical_features')
-assembler= VectorAssembler(inputCols=['dow_category','first_dow_category','seq_category','code_evt_category','lieu_evt_category','first_lieu_evt_category','last_lieu_evt_category','code_service_category','scaled_numerical_features'],outputCol='features')
+assembler= VectorAssembler(inputCols=['lieu_category','code_category','scaled_numerical_features'],outputCol='features')
 labelCol="label"
 
 print("--------------- Random Forest Model definition ----------------")
 rf=RandomForestRegressor(labelCol=labelCol, featuresCol='features', predictionCol='prediction', maxBins=100, numTrees=100, maxDepth=11, subsamplingRate=0.1)
 
 print("------------- transformer pipeline --------------")
-transformerStages=[codeIndexer,firstCodeIndexer,lieuIndexer,firstLieuIndexer,lastLieuIndexer,codeServiceIndexer,ohe,numericalAssembler,numericalScaler,assembler]
+transformerStages=[codeIndexer,lieuIndexer,ohe,numericalAssembler,numericalScaler,assembler]
 transformerPipeline=Pipeline(stages=transformerStages)
 transformer=transformerPipeline.fit(trainingData)
 transformedTrainingData=transformer.transform(trainingData).checkpoint()
