@@ -35,7 +35,7 @@ print(sc.uiWebUrl)
 print("------ train test split --------")
 (trainingData,testData)=data.randomSplit([0.7,0.3])
 
-print("--------- factorization of categorical values ------------")
+print("--------- Indexing categorical values for OHE------------")
 
 codeIndexer = StringIndexer(inputCol='code_evt', outputCol='code_evt_index').setHandleInvalid("keep")
 firstCodeIndexer = StringIndexer(inputCol='first_code_evt', outputCol='first_code_evt_index').setHandleInvalid("keep")
@@ -44,8 +44,10 @@ firstLieuIndexer = StringIndexer(inputCol='first_lieu_evt', outputCol='first_lie
 lastLieuIndexer = StringIndexer(inputCol='lieu_dernier_evt', outputCol='last_lieu_evt_index').setHandleInvalid("keep")
 codeServiceIndexer = StringIndexer(inputCol='code_service', outputCol='code_service_index').setHandleInvalid("keep")
 
+#putting indexed data into a OHE for a better modelling approach
 ohe = OneHotEncoderEstimator(inputCols=['dow','first_dow','seq','code_evt_index','first_code_evt_index','lieu_evt_index','first_lieu_evt_index','last_lieu_evt_index','code_service_index'],outputCols=['dow_category','first_dow_category','seq_category','code_evt_category','first_code_evt_category','lieu_evt_category','first_lieu_evt_category','last_lieu_evt_category','code_service_category']).setHandleInvalid("keep")
 
+#Here i combine numerical features into a vector, rescale them between 0 and 1 and then merge the new scaled numerical features with features from the OHE
 numericalAssembler=VectorAssembler(inputCols=['time','timestamp_delta','contractual_time_difference'],outputCol='numerical_features')
 numericalScaler=MinMaxScaler(inputCol='numerical_features',outputCol='scaled_numerical_features')
 assembler= VectorAssembler(inputCols=['dow_category','first_dow_category','seq_category','code_evt_category','lieu_evt_category','first_lieu_evt_category','last_lieu_evt_category','code_service_category','scaled_numerical_features'],outputCol='features')
@@ -85,7 +87,8 @@ R2=RegressionEvaluator(predictionCol="prediction",labelCol=labelCol,metricName="
 
 MAE=RegressionEvaluator(predictionCol="prediction",labelCol=labelCol,metricName="mae")
 
-
+# Calculation of 3 metrics to check performances of the regression approach (you can change the RF with other regression models)
+# see other regression algorithms here: https://spark.apache.org/docs/2.2.0/ml-classification-regression.html#regression
 errorRMSE=RMSE.evaluate(predictions)
 errorR2=R2.evaluate(predictions)
 errorMAE=MAE.evaluate(predictions)
@@ -98,4 +101,5 @@ print(errorR2)
 print("-------- MAE ---------")
 print(errorMAE)
 
+#check time into the terminal (but can be checked with tools from the cluster)
 print("--- %s seconds ---" % (time.time() - start_time))
